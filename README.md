@@ -1,2 +1,2 @@
-# helix-llm
-Integration of LLMs with helix LSP
+# llm-lsp
+Language Server Protocol for Large Language Models
