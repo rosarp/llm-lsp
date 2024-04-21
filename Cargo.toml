@@ -1,13 +1,20 @@
 [package]
-description = "LSP for LLMs"
+description = "LSP for accessing LLMs"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "llm-lsp"
-version = "0.0.0"
+version = "0.0.1"
 
 [dependencies]
-crossbeam-channel = "0.5.12"
-lsp-server = "0.7.6"
+async-lsp = { version = "0.2.0", features = ["tokio"] }
+# clap = "4.5.4"
+# clap-markdown = "0.1.3"
+futures = "0.3.30"
 lsp-types = "0.95.1"
 serde = { version = "1.0.198", features = ["derive"] }
 serde_json = "1.0.116"
+tokio = { version = "1.37.0", features = ["io-std", "macros", "parking_lot", "rt-multi-thread", "time"] }
+tokio-util = { version = "0.7.10", features = ["compat"] }
+tower = "0.4.13"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
