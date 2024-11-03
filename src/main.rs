@@ -1,66 +1,53 @@
 mod configs;
+mod providers;
+mod server;
 mod state;
 
-use async_lsp::{
-    client_monitor::ClientProcessMonitorLayer, concurrency::ConcurrencyLayer,
-    panic::CatchUnwindLayer, server::LifecycleLayer, tracing::TracingLayer,
-};
-use configs::{get_commands, get_trigger_characters};
-use state::{ServerState, TickEvent};
-use std::time::Duration;
-use tower::ServiceBuilder;
-use tracing::Level;
+use clap::{Parser, Subcommand};
+use server::run_lsp;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let commands = get_commands();
-    let trigger_characters = get_trigger_characters();
+    let cli = Cli::parse();
 
-    let (server, _) = async_lsp::MainLoop::new_server(|client| {
-        tokio::spawn({
-            let client = client.clone();
-            async move {
-                let mut interval = tokio::time::interval(Duration::from_secs(1));
-                loop {
-                    interval.tick().await;
-                    if client.emit(TickEvent).is_err() {
-                        break;
-                    }
-                }
+    match cli.command {
+        Some(command) => match command {
+            Commands::SetProvider { provider } => {
+                // set provider config
             }
-        });
+            Commands::GenerateAuth { provider } => {
+                // generate auth token in config
+            }
+        },
+        None => {
+            // run lsp-llm server
+            run_lsp().await;
+        }
+    }
+}
 
-        ServiceBuilder::new()
-            .layer(TracingLayer::default())
-            .layer(LifecycleLayer::default())
-            .layer(CatchUnwindLayer::default())
-            .layer(ConcurrencyLayer::default())
-            .layer(ClientProcessMonitorLayer::new(client.clone()))
-            .service(ServerState::new_router(
-                client,
-                commands,
-                trigger_characters,
-            ))
-    });
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+#[command(name = "llm-lsp")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
 
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .with_ansi(false)
-        .with_writer(std::io::stderr)
-        .init();
-
-    // Prefer truly asynchronous piped stdin/stdout without blocking tasks.
-    #[cfg(unix)]
-    let (stdin, stdout) = (
-        async_lsp::stdio::PipeStdin::lock_tokio().unwrap(),
-        async_lsp::stdio::PipeStdout::lock_tokio().unwrap(),
-    );
-    // Fallback to spawn blocking read/write otherwise.
-    #[cfg(not(unix))]
-    let (stdin, stdout) = (
-        tokio_util::compat::TokioAsyncReadCompatExt::compat(tokio::io::stdin()),
-        tokio_util::compat::TokioAsyncWriteCompatExt::compat_write(tokio::io::stdout()),
-    );
-
-    server.run_buffered(stdin, stdout).await.unwrap();
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Change provider in .config/llm-lsp/config.toml
+    #[command(arg_required_else_help = true)]
+    SetProvider {
+        /// Name of the provider config
+        #[arg(short, long)]
+        provider: String,
+    },
+    /// Generate auth token & save config in .config/llm-lsp/config.toml
+    #[command(arg_required_else_help = true)]
+    GenerateAuth {
+        /// Name of the person to greet
+        #[arg(short, long)]
+        provider: String,
+    },
 }

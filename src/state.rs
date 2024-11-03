@@ -1,4 +1,4 @@
-use crate::configs::Command;
+use crate::configs::{Command, LspConfig};
 use async_lsp::{router::Router, ClientSocket, LanguageServer, ResponseError};
 use futures::future::BoxFuture;
 use lsp_types::{
@@ -26,20 +26,22 @@ impl<'a> LanguageServer for ServerState<'a> {
         &mut self,
         _params: InitializeParams,
     ) -> BoxFuture<'static, Result<InitializeResult, Self::Error>> {
+        let trigger_characters = self
+            .trigger_characters
+            .iter()
+            .map(|s| (*s).into())
+            .collect();
+        let commands = self.commands.iter().map(|c| c.key.to_owned()).collect();
         Box::pin(async move {
             Ok(InitializeResult {
                 capabilities: ServerCapabilities {
                     completion_provider: Some(CompletionOptions {
                         resolve_provider: Some(false),
-                        trigger_characters: Some(vec![
-                            "{".to_owned(),
-                            "(".to_owned(),
-                            " ".to_owned(),
-                        ]),
+                        trigger_characters: Some(trigger_characters),
                         ..Default::default()
                     }),
                     execute_command_provider: Some(ExecuteCommandOptions {
-                        commands: vec![" ".to_owned(), " ".to_owned(), " ".to_owned()],
+                        commands,
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -78,11 +80,11 @@ impl<'a> LanguageServer for ServerState<'a> {
                 info!("trigger: {trigger_character}");
             }
         }
-        Box::pin(async move {
-            Ok(Some(CompletionResponse::Array(vec![
-                CompletionItem::new_simple("label".to_owned(), "description".to_owned()),
-            ])))
-        })
+        let completion_response = vec![CompletionItem::new_simple(
+            "label".to_owned(),
+            "description".to_owned(),
+        )];
+        Box::pin(async move { Ok(Some(CompletionResponse::Array(completion_response))) })
     }
 
     fn code_action(
@@ -101,22 +103,17 @@ impl<'a> LanguageServer for ServerState<'a> {
 pub struct TickEvent;
 
 impl<'a> ServerState<'a> {
-    pub fn new_router(
-        client: ClientSocket,
-        commands: Vec<Command<'a>>,
-        trigger_characters: Vec<&'a str>,
-    ) -> Router<Self> {
+    pub fn new_router(client: ClientSocket, lsp_config: LspConfig<'a>) -> Router<Self> {
         let mut router = Router::from_language_server(Self {
             client,
-            commands,
-            trigger_characters,
+            commands: lsp_config.commands,
+            trigger_characters: lsp_config.trigger_characters,
         });
         router.event(Self::on_tick);
         router
     }
 
     fn on_tick(&mut self, _: TickEvent) -> ControlFlow<async_lsp::Result<()>> {
-        // info!("tick");
         ControlFlow::Continue(())
     }
 }
