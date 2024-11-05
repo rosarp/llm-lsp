@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-mod ollama;
-mod ollama_auth;
+pub mod codeium;
+pub mod llm_api;
+pub mod ollama;
 
 pub struct AiModelOptions {
     url: String,

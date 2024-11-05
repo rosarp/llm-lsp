@@ -9,15 +9,16 @@ version = "0.0.1"
 async-lsp = { version = "0.2.0", features = ["tokio"] }
 clap = { version = "4.5.20", features = ["derive"] }
 clap-markdown = "0.1.4"
-dirs = "5.0.1"
-dotenvy_macro = "0.15.7"
-figment = { version = "0.10.19", features = ["toml"] }
+confy = "0.6.1"
 futures = "0.3.31"
+inquire = { version = "0.7.5", features = ["editor"] }
 lsp-types = "0.95.1"
+reqwest = { version = "0.12.9", features = ["rustls-tls"] }
 serde = { version = "1.0.214", features = ["derive"] }
 serde_json = "1.0.132"
-tokio = { version = "1.41.0", features = ["io-std", "macros", "parking_lot", "rt-multi-thread", "time"] }
+tokio = { version = "1.41.0", features = ["io-std", "macros", "parking_lot", "rt-multi-thread", "time", "signal"] }
 tokio-util = { version = "0.7.12", features = ["compat"] }
 tower = "0.4.13"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+uuid = { version = "1.11.0", features = ["v4", "fast-rng"] }

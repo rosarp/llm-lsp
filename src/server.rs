@@ -1,5 +1,5 @@
 use crate::{
-    configs::LspConfig,
+    configs::{LlmConfig, LspConfig},
     state::{ServerState, TickEvent},
 };
 use async_lsp::{
@@ -10,8 +10,9 @@ use std::time::Duration;
 use tower::ServiceBuilder;
 use tracing::Level;
 
-pub async fn run_lsp() {
+pub async fn run_lsp(provider: String) {
     let lsp_config = LspConfig::init();
+    let llm_config = LlmConfig::get_configs(provider);
 
     let (server, _) = async_lsp::MainLoop::new_server(|client| {
         tokio::spawn({

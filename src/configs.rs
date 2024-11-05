@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
 pub struct LspConfig<'a> {
     pub commands: Vec<Command<'a>>,
     pub trigger_characters: Vec<&'a str>,
@@ -50,4 +54,41 @@ pub struct Command<'a> {
     pub key: &'a str,
     label: &'a str,
     query: &'a str,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct LlmConfig {
+    codeium: HashMap<String, String>,
+    ollama: HashMap<String, String>,
+    openapi: HashMap<String, String>,
+    copilot: HashMap<String, String>,
+}
+
+impl LlmConfig {
+    pub fn generate_config(
+        provider: String,
+        config_map: HashMap<String, String>,
+    ) -> Result<(), String> {
+        let mut llm_config: LlmConfig = confy::load("llm-lsp", None).unwrap();
+        match provider.as_str() {
+            "codeium" => llm_config.codeium.extend(config_map),
+            "ollama" => llm_config.ollama.extend(config_map),
+            "openapi" => llm_config.openapi.extend(config_map),
+            "copilot" => llm_config.copilot.extend(config_map),
+            _ => return Err("Provider {provider} is not supported as of now!".to_owned()),
+        };
+        confy::store("llm-lsp", None, llm_config).unwrap();
+        Ok(())
+    }
+
+    pub fn get_configs(provider: String) -> Result<HashMap<String, String>, String> {
+        let llm_config: LlmConfig = confy::load("llm-lsp", None).unwrap();
+        match provider.as_str() {
+            "codeium" => Ok(llm_config.codeium),
+            "ollama" => Ok(llm_config.ollama),
+            "openapi" => Ok(llm_config.openapi),
+            "copilot" => Ok(llm_config.copilot),
+            _ => Err("Provider {provider} is not supported as of now!".to_owned()),
+        }
+    }
 }
