@@ -40,7 +40,7 @@ async fn main() {
 
                     match selected_provider {
                         Ok(provider) => match provider {
-                            "codeium" => codeium::generate_api_key(),
+                            "codeium" => codeium::Codeium::generate_api_key().await,
                             "ollama" | "openai" | "copilot" => println!("{provider} is not supported yet"),
                             _ => println!("Please specify a valid provider. To check valid providers run `llm-lsp list-providers`"),
                         },
