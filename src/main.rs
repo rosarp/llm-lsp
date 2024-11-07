@@ -1,12 +1,18 @@
 mod configs;
+mod lsp;
 mod providers;
 mod server;
 mod state;
 
 use clap::{Parser, Subcommand};
+use configs::LlmConfig;
 use inquire::{error::InquireError, Select};
-use providers::codeium;
-use server::run_lsp;
+use providers::{
+    codeium_auth,
+    llm_api::{LlmClientApi, LlmState},
+};
+use server::LlmLanguageServer;
+use tracing::warn;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -17,8 +23,30 @@ async fn main() {
             match command {
                 Commands::Server { provider } => {
                     // get Api
-                    match provider.as_str() {
-                        "codeium" => {}
+                    let llm_config = match LlmConfig::get_configs(&provider) {
+                        Ok(configs) => configs,
+                        Err(_) => {
+                            return;
+                        }
+                    };
+                    let llm_client = match provider.as_str() {
+                        "codeium" => {
+                            let api_key = match llm_config.get("API_KEY") {
+                                Some(k) => k,
+                                None => {
+                                    warn!("API_KEY not found in config");
+                                    return;
+                                }
+                            };
+                            let session_id = match llm_config.get("SESSION_ID") {
+                                Some(s) => s,
+                                None => {
+                                    warn!("SESSION_ID not found in config");
+                                    return;
+                                }
+                            };
+                            LlmState::new(api_key, session_id)
+                        }
                         "ollama" | "openai" | "copilot" => {
                             println!("{provider} is not supported yet");
                             return;
@@ -27,10 +55,10 @@ async fn main() {
                             println!("Invalid provider: {provider}");
                             return;
                         }
-                    }
+                    };
                     // run lsp-llm server
                     // pass Api
-                    run_lsp(provider).await;
+                    LlmLanguageServer::run(llm_client).await;
                 }
                 Commands::GenerateConfig => {
                     let providers: Vec<&str> = vec!["codeium"];
@@ -40,21 +68,12 @@ async fn main() {
 
                     match selected_provider {
                         Ok(provider) => match provider {
-                            "codeium" => codeium::Codeium::generate_api_key().await,
+                            "codeium" => codeium_auth::generate_api_key().await,
                             "ollama" | "openai" | "copilot" => println!("{provider} is not supported yet"),
                             _ => println!("Please specify a valid provider. To check valid providers run `llm-lsp list-providers`"),
                         },
                         Err(error) =>println!("There was an error, please try again: {error}"),
                     }
-                }
-                Commands::ListProviders => {
-                    println!(
-                        r#"
-                        Following providers are supported as of now:
-                            1.codeium
-                        "#
-                    );
-                    println!("In future more providers will be supported such as ollama, openai, copilot.");
                 }
             }
         }
@@ -74,7 +93,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Run `llm-lsp generate-auth` command before running this command
+    /// Run `llm-lsp generate-config` command before running this command
     /// Run LSP server to connect with LLM
     #[command(arg_required_else_help = true)]
     Server {
@@ -85,6 +104,4 @@ enum Commands {
     /// Run this command before running `llm-lsp server` command
     /// Generate auth token & save config in .config/llm-lsp/default-config.toml
     GenerateConfig,
-    /// List supported providers
-    ListProviders,
 }

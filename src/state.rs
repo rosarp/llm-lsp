@@ -1,119 +1,54 @@
-use crate::configs::{Command, LspConfig};
-use async_lsp::{router::Router, ClientSocket, LanguageServer, ResponseError};
-use futures::future::BoxFuture;
-use lsp_types::{
-    CodeActionParams, CodeActionResponse, CompletionItem, CompletionOptions, CompletionParams,
-    CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, ExecuteCommandOptions,
+use async_lsp::lsp_types::Url;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
 };
-use lsp_types::{
-    DidChangeConfigurationParams, InitializeParams, InitializeResult, ServerCapabilities,
-};
-use std::ops::ControlFlow;
-use tracing::log::info;
+use tracing::info;
 
-pub struct ServerState<'a> {
-    client: ClientSocket,
-    commands: Vec<Command<'a>>,
-    trigger_characters: Vec<&'a str>,
+pub struct LanguageState {
+    documents: Arc<RwLock<HashMap<Url, String>>>,
+    language_ids: Arc<RwLock<HashMap<Url, String>>>,
 }
 
-impl<'a> LanguageServer for ServerState<'a> {
-    type Error = ResponseError;
-    type NotifyResult = ControlFlow<async_lsp::Result<()>>;
-
-    fn initialize(
-        &mut self,
-        _params: InitializeParams,
-    ) -> BoxFuture<'static, Result<InitializeResult, Self::Error>> {
-        let trigger_characters = self
-            .trigger_characters
-            .iter()
-            .map(|s| (*s).into())
-            .collect();
-        let commands = self.commands.iter().map(|c| c.key.to_owned()).collect();
-        Box::pin(async move {
-            Ok(InitializeResult {
-                capabilities: ServerCapabilities {
-                    completion_provider: Some(CompletionOptions {
-                        resolve_provider: Some(false),
-                        trigger_characters: Some(trigger_characters),
-                        ..Default::default()
-                    }),
-                    execute_command_provider: Some(ExecuteCommandOptions {
-                        commands,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-                server_info: None,
-            })
-        })
-    }
-
-    fn did_change_configuration(
-        &mut self,
-        _: DidChangeConfigurationParams,
-    ) -> ControlFlow<async_lsp::Result<()>> {
-        ControlFlow::Continue(())
-    }
-
-    fn did_open(&mut self, _params: DidOpenTextDocumentParams) -> Self::NotifyResult {
-        ControlFlow::Continue(())
-    }
-
-    fn did_change(&mut self, _params: DidChangeTextDocumentParams) -> Self::NotifyResult {
-        ControlFlow::Continue(())
-    }
-
-    fn did_close(&mut self, _params: DidCloseTextDocumentParams) -> Self::NotifyResult {
-        ControlFlow::Continue(())
-    }
-
-    fn completion(
-        &mut self,
-        params: CompletionParams,
-    ) -> BoxFuture<'static, Result<Option<CompletionResponse>, ResponseError>> {
-        info!("completion...");
-        if let Some(context) = params.context {
-            if let Some(trigger_character) = context.trigger_character {
-                info!("trigger: {trigger_character}");
-            }
+impl LanguageState {
+    pub fn new() -> Self {
+        LanguageState {
+            documents: Default::default(),
+            language_ids: Default::default(),
         }
-        let completion_response = vec![CompletionItem::new_simple(
-            "label".to_owned(),
-            "description".to_owned(),
-        )];
-        Box::pin(async move { Ok(Some(CompletionResponse::Array(completion_response))) })
     }
 
-    fn code_action(
-        &mut self,
-        _params: CodeActionParams,
-    ) -> BoxFuture<'static, Result<Option<CodeActionResponse>, ResponseError>> {
-        Box::pin(async move { Ok(None) })
+    pub fn get_contents(&self, uri: &Url) -> String {
+        self.documents
+            .read()
+            .expect("poison")
+            .get(uri)
+            .map(|s| s.to_owned())
+            .unwrap_or_default()
     }
 
-    fn shutdown(&mut self, _: ()) -> BoxFuture<'static, Result<(), ResponseError>> {
-        info!("shutdown...");
-        Box::pin(async move { Ok(()) })
-    }
-}
-
-pub struct TickEvent;
-
-impl<'a> ServerState<'a> {
-    pub fn new_router(client: ClientSocket, lsp_config: LspConfig<'a>) -> Router<Self> {
-        let mut router = Router::from_language_server(Self {
-            client,
-            commands: lsp_config.commands,
-            trigger_characters: lsp_config.trigger_characters,
-        });
-        router.event(Self::on_tick);
-        router
+    pub fn get_language_id(&self, uri: &Url) -> String {
+        self.language_ids
+            .read()
+            .expect("poison")
+            .get(uri)
+            .map(|s| s.to_owned())
+            .unwrap_or_default()
     }
 
-    fn on_tick(&mut self, _: TickEvent) -> ControlFlow<async_lsp::Result<()>> {
-        ControlFlow::Continue(())
+    pub fn upsert_content(&mut self, uri: &Url, content: String) {
+        let mut docs = self.documents.write().expect("poison");
+        docs.insert(uri.clone(), content);
+    }
+
+    pub fn upsert_file(&mut self, uri: &Url, content: String, language_id: Option<String>) {
+        info!("upserting file: {}", uri);
+        if let Some(language_id) = language_id {
+            self.language_ids
+                .write()
+                .expect("poison")
+                .insert(uri.clone(), language_id);
+        };
+        self.upsert_content(uri, content);
     }
 }
