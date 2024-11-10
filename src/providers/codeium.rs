@@ -40,7 +40,6 @@ impl LlmClientApi for LlmState {
             .unwrap();
         LlmState {
             auth_url,
-            headers,
             api_key: api_key.to_owned(),
             session_id: session_id.to_owned(),
             client,
@@ -69,7 +68,6 @@ impl LlmClientApi for LlmState {
             }
         }
         cursor_offset += request.position_char as usize;
-        let text = request.contents[0..cursor_offset].to_owned();
         // The editor name needs to be known by codeium
         // The extensionVersion needs to a recent one, so codeium accepts it
         let request_body = CodeiumRequest {
@@ -88,7 +86,7 @@ impl LlmClientApi for LlmState {
                 line_ending: "\n".to_owned(),
                 absolute_path: request.filepath.clone(),
                 relative_path: request.filepath.clone(),
-                text,
+                text: request.contents,
             },
             editor_options: EditorOptions {
                 tab_size: 2,
@@ -110,22 +108,25 @@ impl LlmClientApi for LlmState {
                             Ok(resp_ok) => {
                                 if let Some(ref completion_items) = resp_ok.completion_items {
                                     let mut items = Vec::with_capacity(completion_items.len());
+                                    let range = Range {
+                                        start: Position {
+                                            line: request.position_line,
+                                            character: 0,
+                                        },
+                                        end: Position {
+                                            line: request.position_line + 1,
+                                            character: 0,
+                                        },
+                                    };
                                     for item in completion_items {
+                                        let mut new_text = item.completion.text.to_owned();
+                                        new_text.push('\n');
                                         items.push(CompletionItem {
-                                            label: item.completion.original_text.to_owned(),
+                                            label: item.completion.text.trim().to_owned(),
                                             kind: Some(CompletionItemKind::TEXT),
                                             text_edit: Some(CompletionTextEdit::Edit(TextEdit {
-                                                range: Range {
-                                                    start: Position {
-                                                        line: request.position_line,
-                                                        character: request.position_char,
-                                                    },
-                                                    end: Position {
-                                                        line: request.position_line,
-                                                        character: request.position_char,
-                                                    },
-                                                },
-                                                new_text: item.completion.original_text.to_owned(),
+                                                range,
+                                                new_text,
                                             })),
                                             ..Default::default()
                                         });
@@ -232,7 +233,6 @@ struct CodeiumCompletionItems {
 #[serde(rename_all = "camelCase")]
 struct CodeiumCompletion {
     text: String,
-    original_text: String,
 }
 
 #[derive(Deserialize, Debug)]

@@ -804,7 +804,7 @@ checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
 
 [[package]]
 name = "llm-lsp"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "async-lsp",
  "clap",

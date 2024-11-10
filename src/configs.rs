@@ -51,7 +51,9 @@ impl<'a> LspConfig<'a> {
 
 pub struct Command<'a> {
     pub key: &'a str,
+    #[allow(unused)]
     label: &'a str,
+    #[allow(unused)]
     query: &'a str,
 }
 

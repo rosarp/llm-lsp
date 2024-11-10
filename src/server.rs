@@ -16,6 +16,7 @@ pub struct LlmLanguageServer<'a, T>
 where
     T: LlmClientApi,
 {
+    #[allow(unused)]
     pub client: ClientSocket,
     pub commands: Vec<Command<'a>>,
     pub trigger_characters: Vec<&'a str>,

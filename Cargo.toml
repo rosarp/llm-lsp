@@ -3,7 +3,7 @@ description = "LSP server to communicate with LLMs"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "llm-lsp"
-version = "0.0.1"
+version = "0.1.0"
 
 [dependencies]
 async-lsp = { version = "0.2.0", features = ["tokio"] }
