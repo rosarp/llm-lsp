@@ -30,7 +30,7 @@ Once llm-lsp is executed, it will guide through the process to generate API_KEY 
 
 ##### Configure editor command
 
-    llm-lsp server -p "codeium"
+    llm-lsp server -p codeium
 
 
 ##### Helix Editor configuration
