@@ -7,6 +7,9 @@ Editors will be able to use this as lsp for code completions.
 #### Current Features:
 
     [x] Code completion using codeium.ai
+    [x] Uses async
+    [x] Allows users to use same binary for different AI models with cli option
+    [x] Saves multiple configs to be used by different instances of llm-lsp
 
 
 #### How to build:
