@@ -25,7 +25,7 @@ where
 
     fn initialize(
         &mut self,
-        _: InitializeParams,
+        params: InitializeParams,
     ) -> BoxFuture<'static, Result<InitializeResult, Self::Error>> {
         let trigger_characters = self
             .trigger_characters
@@ -33,6 +33,14 @@ where
             .map(|&s| (*s).into())
             .collect();
         let commands = self.commands.iter().map(|c| c.key.to_owned()).collect();
+        let unknown = "unknown".to_owned();
+        if let Some(client_info) = params.client_info {
+            let client_version = client_info.version.unwrap_or(unknown);
+            self.state
+                .update_client_info(client_info.name, client_version);
+        } else {
+            self.state.update_client_info("web".to_owned(), unknown);
+        };
         Box::pin(async move {
             Ok(InitializeResult {
                 capabilities: ServerCapabilities {
@@ -78,9 +86,10 @@ where
 
     fn did_change(&mut self, params: DidChangeTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
-        let content = params.content_changes[0].text.clone();
-
-        self.state.upsert_file(&uri, content, None);
+        if !params.content_changes.is_empty() {
+            let content = params.content_changes[0].text.clone();
+            self.state.upsert_file(&uri, content, None);
+        }
         ControlFlow::Continue(())
     }
 
@@ -92,7 +101,6 @@ where
         &mut self,
         params: CompletionParams,
     ) -> BoxFuture<'static, Result<Option<CompletionResponse>, ResponseError>> {
-        info!("completion: {:?}", params);
         if let Some(context) = params.context {
             if let Some(_trigger_character) = context.trigger_character {
                 // info!("trigger: {trigger_character}");
@@ -119,6 +127,8 @@ where
             position_line,
             position_char,
             suggestions: 3,
+            client_name: self.state.client_info.name.clone(),
+            client_version: self.state.client_info.version.clone(),
         })
     }
 

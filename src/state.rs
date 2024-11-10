@@ -8,6 +8,13 @@ use tracing::info;
 pub struct LanguageState {
     documents: Arc<RwLock<HashMap<Url, String>>>,
     language_ids: Arc<RwLock<HashMap<Url, String>>>,
+    pub client_info: ClientInfo,
+}
+
+#[derive(Default)]
+pub struct ClientInfo {
+    pub name: String,
+    pub version: String,
 }
 
 impl LanguageState {
@@ -15,6 +22,7 @@ impl LanguageState {
         LanguageState {
             documents: Default::default(),
             language_ids: Default::default(),
+            client_info: Default::default(),
         }
     }
 
@@ -50,5 +58,9 @@ impl LanguageState {
                 .insert(uri.clone(), language_id);
         };
         self.upsert_content(uri, content);
+    }
+
+    pub fn update_client_info(&mut self, name: String, version: String) {
+        self.client_info = ClientInfo { name, version };
     }
 }

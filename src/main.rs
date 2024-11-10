@@ -22,7 +22,6 @@ async fn main() {
         Some(command) => {
             match command {
                 Commands::Server { provider } => {
-                    // get Api
                     let llm_config = match LlmConfig::get_configs(&provider) {
                         Ok(configs) => configs,
                         Err(_) => {
@@ -57,7 +56,6 @@ async fn main() {
                         }
                     };
                     // run lsp-llm server
-                    // pass Api
                     LlmLanguageServer::run(llm_client).await;
                 }
                 Commands::GenerateConfig => {

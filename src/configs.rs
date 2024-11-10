@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub struct LspConfig<'a> {
     pub commands: Vec<Command<'a>>,

@@ -3,20 +3,24 @@ use super::{
     llm_api::{CompletionRequest, LlmClientApi, LlmState},
 };
 use async_lsp::{
-    lsp_types::{CompletionItem, CompletionResponse},
+    lsp_types::{
+        CompletionItem, CompletionItemKind, CompletionResponse, CompletionTextEdit, Position,
+        Range, TextEdit,
+    },
     ResponseError,
 };
 use futures::future::BoxFuture;
-use reqwest::header::{
-    HeaderMap, HeaderValue, ACCEPT_ENCODING, AUTHORIZATION, CONNECTION, CONTENT_TYPE,
+use reqwest::{
+    header::{HeaderMap, HeaderValue, ACCEPT_ENCODING, AUTHORIZATION, CONNECTION, CONTENT_TYPE},
+    StatusCode,
 };
-use serde::Serialize;
-use tracing::info;
+use serde::{Deserialize, Serialize};
+use tracing::{info, warn};
 
 impl LlmClientApi for LlmState {
     fn new(api_key: &str, session_id: &str) -> LlmState {
         let auth_url = "https://web-backend.codeium.com/exa.language_server_pb.LanguageServerService/GetCompletions".to_owned();
-        let mut headers = HeaderMap::with_capacity(2);
+        let mut headers = HeaderMap::with_capacity(4);
         headers.insert(
             ACCEPT_ENCODING,
             HeaderValue::from_static("gzip, deflate, br"),
@@ -28,8 +32,8 @@ impl LlmClientApi for LlmState {
                 .parse()
                 .unwrap(),
         );
-        headers.insert(CONNECTION, HeaderValue::from_static("keep-alive"));
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        headers.insert(CONNECTION, HeaderValue::from_static("keep-alive"));
         let client = reqwest::Client::builder()
             .default_headers(headers.clone())
             .build()
@@ -54,28 +58,33 @@ impl LlmClientApi for LlmState {
             .unwrap_or(&0usize)
             .to_owned();
         let mut cursor_offset = 0usize;
-        let text = request.contents;
-        let lines = text.split("\n").collect::<Vec<&str>>();
+        let lines_len = request
+            .contents
+            .split("\n")
+            .map(|line| line.len())
+            .collect::<Vec<usize>>();
         for i in 0..request.position_line {
-            if let Some(&ln) = lines.get(i as usize) {
-                cursor_offset += ln.len();
+            if let Some(&len) = lines_len.get(i as usize) {
+                cursor_offset += len + 1;
             }
         }
+        cursor_offset += request.position_char as usize;
+        let text = request.contents[0..cursor_offset].to_owned();
         // The editor name needs to be known by codeium
         // The extensionVersion needs to a recent one, so codeium accepts it
         let request_body = CodeiumRequest {
             metadata: Metadata {
                 ide_name: "web".to_owned(),
                 ide_version: "unknown".to_owned(),
-                extension_version: "1.6.13".to_owned(),
-                extension_name: "helix-gpt".to_owned(),
+                extension_version: "0.1.0".to_owned(),
+                extension_name: "llm-lsp".to_owned(),
                 api_key: self.api_key.clone(),
                 session_id: self.session_id.clone(),
             },
             document: Document {
                 editor_language: request.language_id,
                 language,
-                cursor_offset: cursor_offset + request.position_char as usize,
+                cursor_offset,
                 line_ending: "\n".to_owned(),
                 absolute_path: request.filepath.clone(),
                 relative_path: request.filepath.clone(),
@@ -95,12 +104,71 @@ impl LlmClientApi for LlmState {
         Box::pin(async move {
             match send.await {
                 Ok(response) => {
-                    let llm_response = response.text().await.unwrap();
-                    info!("response: {}", llm_response);
-                    let completion_response = vec![CompletionItem::new_simple(
-                        llm_response,
-                        "description".to_owned(),
-                    )];
+                    let status = response.status();
+                    let completion_response = match status {
+                        StatusCode::OK => match response.json::<CodeiumResponseOk>().await {
+                            Ok(resp_ok) => {
+                                if let Some(ref completion_items) = resp_ok.completion_items {
+                                    let mut items = Vec::with_capacity(completion_items.len());
+                                    for item in completion_items {
+                                        items.push(CompletionItem {
+                                            label: item.completion.original_text.to_owned(),
+                                            kind: Some(CompletionItemKind::TEXT),
+                                            text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                                                range: Range {
+                                                    start: Position {
+                                                        line: request.position_line,
+                                                        character: request.position_char,
+                                                    },
+                                                    end: Position {
+                                                        line: request.position_line,
+                                                        character: request.position_char,
+                                                    },
+                                                },
+                                                new_text: item.completion.original_text.to_owned(),
+                                            })),
+                                            ..Default::default()
+                                        });
+                                    }
+                                    items
+                                } else {
+                                    vec![]
+                                }
+                            }
+                            Err(error) => {
+                                warn!("JsonOk Error: {:?}", error);
+                                vec![CompletionItem::new_simple(
+                                    format!("{:?}", error),
+                                    "JsonOk Err".to_owned(),
+                                )]
+                            }
+                        },
+                        StatusCode::BAD_REQUEST => {
+                            match response.json::<CodeiumResponseErr>().await {
+                                Ok(resp_err) => {
+                                    info!("ResponseErr Value: {:?}", resp_err);
+                                    vec![CompletionItem::new_simple(
+                                        resp_err.code,
+                                        resp_err.message,
+                                    )]
+                                }
+                                Err(error) => {
+                                    warn!("JsonErr Error: {:?}", error);
+                                    vec![CompletionItem::new_simple(
+                                        format!("{:?}", error),
+                                        "JsonErr Err".to_owned(),
+                                    )]
+                                }
+                            }
+                        }
+                        _ => {
+                            info!("http error: {}", status);
+                            vec![CompletionItem::new_simple(
+                                "".to_owned(),
+                                "Json Ok Error".to_owned(),
+                            )]
+                        }
+                    };
                     Ok(Some(CompletionResponse::Array(completion_response)))
                 }
                 Err(error) => {
@@ -121,18 +189,13 @@ struct CodeiumRequest {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Metadata {
-    #[serde(rename = "ideName")]
-    ide_name: String, //"web"
-    #[serde(rename = "ideVersion")]
-    ide_version: String, // "unknown"
-    #[serde(rename = "extensionVersion")]
+    ide_name: String,          //"web"
+    ide_version: String,       // "unknown"
     extension_version: String, // "1.6.13"
-    #[serde(rename = "extensionName")]
-    extension_name: String, // "helix-gpt"
-    #[serde(rename = "apiKey")]
+    extension_name: String,    // "helix-gpt"
     api_key: String,
-    #[serde(rename = "sessionId")]
     session_id: String,
 }
 
@@ -151,4 +214,29 @@ struct Document {
 struct EditorOptions {
     tab_size: usize, //2
     insert_spaces: bool,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CodeiumResponseOk {
+    completion_items: Option<Vec<CodeiumCompletionItems>>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CodeiumCompletionItems {
+    completion: CodeiumCompletion,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CodeiumCompletion {
+    text: String,
+    original_text: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct CodeiumResponseErr {
+    code: String,
+    message: String,
 }

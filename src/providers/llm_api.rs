@@ -9,6 +9,8 @@ pub struct CompletionRequest {
     pub position_line: u32,
     pub position_char: u32,
     pub suggestions: u32,
+    pub client_name: String,
+    pub client_version: String,
 }
 
 pub struct LlmState {
