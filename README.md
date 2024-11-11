@@ -12,7 +12,11 @@ Editors will be able to use this as lsp for code completions.
     [x] Saves multiple configs to be used by different instances of llm-lsp
 
 
-#### How to build:
+#### How to install:
+
+    cargo install llm-lsp
+
+#### How to build locally:
 
     cargo build --release
 
