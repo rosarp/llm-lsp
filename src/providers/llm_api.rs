@@ -8,8 +8,7 @@ pub struct CompletionRequest {
     pub language_id: String,
     pub position_line: u32,
     pub position_char: u32,
-    #[allow(unused)]
-    pub suggestions: u32,
+    pub suggestions: usize,
     #[allow(unused)]
     pub client_name: String,
     #[allow(unused)]

@@ -118,7 +118,10 @@ impl LlmClientApi for LlmState {
                                             character: 0,
                                         },
                                     };
-                                    for item in completion_items {
+                                    for (idx, item) in completion_items.iter().enumerate() {
+                                        if idx == request.suggestions {
+                                            break;
+                                        }
                                         let mut new_text = item.completion.text.to_owned();
                                         new_text.push('\n');
                                         items.push(CompletionItem {

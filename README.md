@@ -1,62 +1,124 @@
 # llm-lsp
 
-Language Server Protocol for Large Language Models
+A Language Server Protocol (LSP) implementation for integrating Large Language Models into text editors. This project enables developers to leverage AI-powered code completions directly within their favorite editors that support the LSP protocol.
 
-Editors will be able to use this as lsp for code completions.
+## Overview
 
-#### Current Features:
+llm-lsp serves as a bridge between your text editor and AI code completion services. Currently supporting Codeium.ai, it provides intelligent code suggestions while you type, enhancing your coding productivity without leaving your editor.
 
-    [x] Code completion using codeium.ai
-    [x] Uses async
-    [x] Allows users to use same binary for different AI models with cli option
-    [x] Saves multiple configs to be used by different instances of llm-lsp
+## Features
 
+- **AI-Powered Code Completion**
+  - Integration with [Codeium.ai](https://codeium.ai) for intelligent code suggestions
+  - Real-time completion as you type
+  - Context-aware suggestions based on your codebase
 
-#### How to install:
+- **Performance**
+  - Asynchronous operation for responsive editing experience
+  - Efficient communication between editor and AI service
 
-    cargo install llm-lsp
+- **Flexibility**
+  - Support for multiple AI models through CLI options
+  - Multiple configuration profiles for different use cases
+  - Easy configuration management with OS-specific TOML configs
 
-#### How to build locally:
+- **Editor Support**
+  - Seamless integration with LSP-compatible editors
+  - Detailed setup instructions for Helix editor
+  - Extensible design for future editor support
 
-    cargo build --release
+## Installation
 
-#### Usage: 
+### From Cargo (Recommended)
 
-##### Display help
+```bash
+cargo install llm-lsp
+```
 
-    llm-lsp -h
+### Build from Source
 
-##### Display version
+1. Clone the repository
+2. Build the project:
+```bash
+cargo build --release
+```
+3. The binary will be available in `target/release/llm-lsp`
 
-    llm-lsp -V
+## Usage
 
-##### Generate Config
-Once llm-lsp is executed, it will guide through the process to generate API_KEY (in case of codeium) and save the relevant configurations in OS specific toml configs.
+### Initial Setup
 
-    llm-lsp generate-config
+1. Generate configuration:
+```bash
+llm-lsp generate-config
+```
+This will guide you through setting up your API key and other configurations.
 
-##### Configure editor command
+### Command Line Interface
 
-    llm-lsp server -p codeium
+- Show help:
+```bash
+llm-lsp -h
+```
 
+- Display version:
+```bash
+llm-lsp -V
+```
 
-##### Helix Editor configuration
+- Start LSP server with Codeium provider:
+```bash
+llm-lsp server -p codeium
+```
 
-    [language-server.llm-lsp]
-    command = "llm-lsp"
-    args = ["server", "-p", "codeium"]
+### Editor Configuration
 
-    [[language]]
-    name = "rust"
-    language-servers = [
-        "rust-analyzer",
-        "llm-lsp",
-    ]
+#### Helix Editor
 
+Add the following to your Helix configuration:
 
+```toml
+[language-server.llm-lsp]
+command = "llm-lsp"
+args = ["server", "-p", "codeium"]
 
+[[language]]
+name = "rust"  # Or any supported language
+language-servers = [
+    "rust-analyzer",  # Or any supported language server
+    "llm-lsp",
+]
+```
 
-#### Future:
+## Configuration
 
-    [ ] More Documentation
-    [ ] Add chat support on cli
+The configuration file is automatically created in the OS-specific config directory:
+- Linux: `~/.config/llm-lsp`
+- macOS: `~/Library/Application Support/llm-lsp`
+- Windows: `%APPDATA%\llm-lsp`
+
+## Roadmap
+
+- [ ] CLI-based chat support
+- [ ] Support for additional AI providers
+- [ ] More editor-specific configurations
+- [ ] Improved completion context handling
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under either of:
+- MIT license
+- Apache License, Version 2.0
+
+at your option.
+
+## Author
+
+Rohit Sarpotdar <rohi7ns@gmail.com>
+
+---
+For more information, bug reports, or feature requests, please visit the [GitHub repository](https://github.com/rosarp/llm-lsp).
