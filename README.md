@@ -116,9 +116,5 @@ This project is licensed under either of:
 
 at your option.
 
-## Author
-
-Rohit Sarpotdar <rohi7ns@gmail.com>
-
 ---
 For more information, bug reports, or feature requests, please visit the [GitHub repository](https://github.com/rosarp/llm-lsp).
