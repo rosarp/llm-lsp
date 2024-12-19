@@ -114,16 +114,15 @@ impl LlmClientApi for LlmState {
                                             character: 0,
                                         },
                                         end: Position {
-                                            line: request.position_line + 1,
-                                            character: 0,
+                                            line: request.position_line,
+                                            character: request.position_char,
                                         },
                                     };
                                     for (idx, item) in completion_items.iter().enumerate() {
                                         if idx == request.suggestions {
                                             break;
                                         }
-                                        let mut new_text = item.completion.text.to_owned();
-                                        new_text.push('\n');
+                                        let new_text = item.completion.text.to_owned();
                                         items.push(CompletionItem {
                                             label: item.completion.text.trim().to_owned(),
                                             kind: Some(CompletionItemKind::TEXT),
