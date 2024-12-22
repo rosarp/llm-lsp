@@ -13,10 +13,11 @@ use async_lsp::{
     LanguageServer, ResponseError,
 };
 use futures::future::BoxFuture;
+use ropey::Rope;
 use std::ops::ControlFlow;
 use tracing::info;
 
-impl<'a, T> LanguageServer for LlmLanguageServer<'a, T>
+impl<T> LanguageServer for LlmLanguageServer<'_, T>
 where
     T: LlmClientApi,
 {
@@ -56,7 +57,7 @@ where
                     }),
                     text_document_sync: Some(TextDocumentSyncCapability::Options(
                         TextDocumentSyncOptions {
-                            change: Some(TextDocumentSyncKind::FULL),
+                            change: Some(TextDocumentSyncKind::INCREMENTAL),
                             open_close: Some(true),
                             ..Default::default()
                         },
@@ -77,7 +78,7 @@ where
 
     fn did_open(&mut self, params: DidOpenTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
-        let content = params.text_document.text;
+        let content = Rope::from(params.text_document.text);
         let language_id = params.text_document.language_id;
 
         self.state.upsert_file(&uri, content, Some(language_id));
@@ -86,14 +87,16 @@ where
 
     fn did_change(&mut self, params: DidChangeTextDocumentParams) -> Self::NotifyResult {
         let uri = params.text_document.uri;
+
         if !params.content_changes.is_empty() {
-            let content = params.content_changes[0].text.clone();
-            self.state.upsert_file(&uri, content, None);
+            self.state.change_file(&uri, params.content_changes);
         }
         ControlFlow::Continue(())
     }
 
-    fn did_close(&mut self, _params: DidCloseTextDocumentParams) -> Self::NotifyResult {
+    fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Self::NotifyResult {
+        let uri = params.text_document.uri;
+        self.state.remove_file(&uri);
         ControlFlow::Continue(())
     }
 
@@ -112,8 +115,7 @@ where
             .uri
             .path()
             .to_owned();
-        let position_line = params.text_document_position.position.line;
-        let position_char = params.text_document_position.position.character;
+        let position = params.text_document_position.position;
         let contents = self
             .state
             .get_contents(&Url::from_file_path(&filepath).unwrap());
@@ -124,8 +126,7 @@ where
             contents,
             filepath,
             language_id,
-            position_line,
-            position_char,
+            position,
             suggestions: 3,
             client_name: self.state.client_info.name.clone(),
             client_version: self.state.client_info.version.clone(),
