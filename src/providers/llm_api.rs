@@ -1,13 +1,16 @@
-use async_lsp::{lsp_types::CompletionResponse, ResponseError};
+use async_lsp::{
+    lsp_types::{CompletionResponse, Position},
+    ResponseError,
+};
 use futures::future::BoxFuture;
 use reqwest::Client;
+use ropey::Rope;
 
 pub struct CompletionRequest {
-    pub contents: String,
+    pub contents: Rope,
     pub filepath: String,
     pub language_id: String,
-    pub position_line: u32,
-    pub position_char: u32,
+    pub position: Position,
     pub suggestions: usize,
     #[allow(unused)]
     pub client_name: String,

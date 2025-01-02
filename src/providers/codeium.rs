@@ -1,3 +1,5 @@
+use crate::state::position_to_char_index;
+
 use super::{
     codeium_types,
     llm_api::{CompletionRequest, LlmClientApi, LlmState},
@@ -56,18 +58,8 @@ impl LlmClientApi for LlmState {
             .get(&request.language_id)
             .unwrap_or(&0usize)
             .to_owned();
-        let mut cursor_offset = 0usize;
-        let lines_len = request
-            .contents
-            .split("\n")
-            .map(|line| line.len())
-            .collect::<Vec<usize>>();
-        for i in 0..request.position_line {
-            if let Some(&len) = lines_len.get(i as usize) {
-                cursor_offset += len + 1;
-            }
-        }
-        cursor_offset += request.position_char as usize;
+        let cursor_offset = position_to_char_index(&request.contents, request.position);
+
         // The editor name needs to be known by codeium
         // The extensionVersion needs to a recent one, so codeium accepts it
         let request_body = CodeiumRequest {
@@ -86,7 +78,7 @@ impl LlmClientApi for LlmState {
                 line_ending: "\n".to_owned(),
                 absolute_path: request.filepath.clone(),
                 relative_path: request.filepath.clone(),
-                text: request.contents,
+                text: request.contents.to_string(),
             },
             editor_options: EditorOptions {
                 tab_size: 2,
@@ -110,13 +102,10 @@ impl LlmClientApi for LlmState {
                                     let mut items = Vec::with_capacity(completion_items.len());
                                     let range = Range {
                                         start: Position {
-                                            line: request.position_line,
+                                            line: request.position.line,
                                             character: 0,
                                         },
-                                        end: Position {
-                                            line: request.position_line,
-                                            character: request.position_char,
-                                        },
+                                        end: request.position,
                                     };
                                     for (idx, item) in completion_items.iter().enumerate() {
                                         if idx == request.suggestions {
