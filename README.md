@@ -106,7 +106,7 @@ The configuration file is automatically created in the OS-specific config direct
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! However, please open an issue to discuss larger changes, to avoid doing a lot of work that may get rejected.
 
 ## License
 
